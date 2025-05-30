@@ -50,7 +50,7 @@ iptables -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --
 ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j MARK --set-mark 0xDEA10000 -m comment --comment "hahaha"
 ```
 
-若需要使用低TTL（以2为例），校验和正常，只需设置mark为0xDEA00002
+## 若需要使用低TTL（以2为例），校验和正常，只需设置mark为0xDEA00002
 
 
 
