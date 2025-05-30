@@ -4,19 +4,22 @@
 #include <linux/debugfs.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6.h>
-
-#define MARK_MAGIC	GENMASK(31, 16)
-#define MARK_WR_ACKSEQ	BIT(15)
-#define MARK_WR_SEQ	BIT(14)
-#define MARK_WR_CHKSUM	BIT(13)
-#define MARK_REPEAT	GENMASK(12, 10)
-#define MARK_DELAY	GENMASK(9, 5)
-#define MARK_TTL	GENMASK(4, 0)
+#define MARK_MAGIC	GENMASK(31, 20)
+#define MARK_WR_ACKSEQ	BIT(18)
+#define MARK_WR_SEQ	BIT(17)
+#define MARK_WR_CHKSUM	BIT(16)
+#define MARK_REPEAT	GENMASK(15, 13)
+#define MARK_DELAY	GENMASK(12, 8)
+#define MARK_TTL	GENMASK(7, 0)
 
 #define NF_DEAF_TCP_DOFF	10
 #define NF_DEAF_BUF_SIZE	256
-#define NF_DEAF_BUF_DEFAULT	"USER ftpuser\r\n"
-
+#define NF_DEAF_BUF_DEFAULT	"GET / HTTP/1.1\r\n\
+Host: www.speedtest.cn\r\n\
+User-Agent: Mozilla/5.0\r\n\
+Accept: */*\r\n\
+Connection: keep-alive\r\n\
+\r\n"
 struct nf_deaf_skb_cb {
 	union {
 		struct inet_skb_parm _4;
@@ -346,7 +349,7 @@ nf_deaf_xmit6(const struct sk_buff *oskb, const struct ipv6hdr *oip6h,
 	th->check = csum_ipv6_magic(&ip6h->saddr, &ip6h->daddr, th->doff * 4 + tmp_buf_size,
 				    IPPROTO_TCP, csum_partial(th, th->doff * 4 + tmp_buf_size,
 							      0));
-	th->check += corrupt_checksum;
+        th->check += corrupt_checksum;
 
 	return nf_deaf_send_generated_skb(skb, state, repeat);
 }
@@ -359,7 +362,7 @@ nf_deaf_postrouting_hook4(void *priv, struct sk_buff *skb,
 	struct tcphdr *th;
 	u32 delay;
 
-	if (likely(FIELD_GET(MARK_MAGIC, skb->mark) != 0xdeaf))
+	if (likely(FIELD_GET(MARK_MAGIC, skb->mark) != 0xdea))
 		return NF_ACCEPT;
 
 	iph = ip_hdr(skb);
@@ -393,7 +396,7 @@ nf_deaf_postrouting_hook6(void *priv, struct sk_buff *skb,
 	struct tcphdr *th;
 	u32 delay;
 
-	if (likely(FIELD_GET(MARK_MAGIC, skb->mark) != 0xdeaf))
+	if (likely(FIELD_GET(MARK_MAGIC, skb->mark) != 0xdea))
 		return NF_ACCEPT;
 
 	ip6h = ipv6_hdr(skb);
