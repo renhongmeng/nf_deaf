@@ -98,6 +98,8 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 
 ## 示例3：nftables，同示例2，但跳过私有地址，作用到其余所有地址
 
+## 警告！未经测试，可能使你无法连接路由器，自担风险使用
+
 ```
 #!/usr/sbin/nft -f
 

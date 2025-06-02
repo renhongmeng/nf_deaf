@@ -101,6 +101,8 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 
 ## Example 3: nftables — same as Example 2, but skips private/reserved
 
+## Warning! Untested—using it may lock you out of the router. Proceed at your own risk.
+
 ```
 #!/usr/sbin/nft -f
 
