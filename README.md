@@ -96,3 +96,30 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j ACCEPT
 ```
 
+## 示例3：nftables，同示例2，但跳过私有地址，作用到其余所有地址
+
+```
+#!/usr/sbin/nft -f
+
+#清空nftables规则，小心这一条
+flush ruleset
+
+table inet filter {
+    chain postrouting {
+        type filter hook postrouting priority 0 ; policy accept;
+        #跳过IPv4私有地址
+        ip daddr {100.64.0.0/10, 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.88.99.0/24, 192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4} return
+        #跳过IPv6私有地址
+        ip6 daddr {::, ::1, ::ffff:0:0:0/96, 64:ff9b::/96, 100::/64, 2001::/32, 2001:20::/28, 2001:db8::/32, 2002::/16, fc00::/7, fe80::/10, ff00::/8} return
+        #被标记的连接不再打标记
+        ct mark 0xDEA10103 return
+        #IPv4，其余所有地址，端口0-65535，长度大于120的包，设置连接标记和包标记
+        ip protocol tcp tcp dport { 0-65535 } meta length gt 120 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+        #IPv6，其余所有地址，端口0-65535，长度大于100的包，设置连接标记和包标记
+        ip6 nexthdr tcp tcp dport { 0-65535 } meta length gt 100 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+
+    }
+
+}
+```
+

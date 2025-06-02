@@ -99,6 +99,32 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j ACCEPT
 ```
 
+## Example 3: nftables — same as Example 2, but skips private/reserved
+
+```
+#!/usr/sbin/nft -f
+
+# Flush all nftables rules (be careful with this line)
+flush ruleset
+
+table inet filter {
+    chain postrouting {
+        type filter hook postrouting priority 0 ; policy accept;
+        # Skip IPv4 private/reserved addresses
+        ip daddr {100.64.0.0/10, 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.88.99.0/24, 192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4} return
+        #Skip IPv6 private/reserved addresses
+        ip6 daddr {::, ::1, ::ffff:0:0:0/96, 64:ff9b::/96, 100::/64, 2001::/32, 2001:20::/28, 2001:db8::/32, 2002::/16, fc00::/7, fe80::/10, ff00::/8} return
+        # If the connection is already marked, skip further processing
+        ct mark 0xDEA10103 return
+        # IPv4: mark connections & packets whose TCP payload > 120 bytes
+        ip protocol tcp tcp dport { 0-65535 } meta length gt 120 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+        # IPv6: mark connections & packets whose TCP payload > 100 bytes
+        ip6 nexthdr tcp tcp dport { 0-65535 } meta length gt 100 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+
+    }
+
+}
+```
 
 
 
