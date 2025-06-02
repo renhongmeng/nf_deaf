@@ -52,7 +52,7 @@ iptables -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --
 ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j MARK --set-mark 0xDEA10000 -m comment --comment "hahaha"
 ```
 
-## 示例2：TTL为3，错误的TCP校验和，只在握手成功后发一次伪装包，mark是0xDEA10103
+## 示例2：TTL为3，错误的TCP校验和，只在握手成功后发一次伪装包，为防止原始包抢先发出设置jiffies为1，mark是0xDEA10103
 
 1. nftables配置文件示例
 ```

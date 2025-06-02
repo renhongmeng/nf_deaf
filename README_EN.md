@@ -53,7 +53,7 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 ```
 
 
-## Example 2: TTL set to 3, incorrect TCP checksum, spoofed packet sent only once after handshake, mark is 0xDEA10103
+## Example 2: TTL set to 3, incorrect TCP checksum, spoofed packet sent only once after handshake. To prevent the original packet from being sent prematurely, set jiffies to 1. mark is 0xDEA10103
 
 1. Nftables Configuration Example
 ```
