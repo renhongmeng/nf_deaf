@@ -33,11 +33,13 @@ This is a Linux kernel module installed on a router that, immediately after a su
 | Delay original packet (in jiffies) |8-12|
 | Set TTL (0 for system default) |0-7|
 
-##  Example: Minimize side effects, only corrupt the TCP checksum, mark = 0xDEA10000
+##  Example: Minimize side effects, only corrupt the TCP checksum, mark = 0xDEA10000. If you need to use a low TTL (e.g., 2) with a correct checksum, set the mark to 0xDEA00002.
 
 IPv4 example: 1.1.1.1
 
 IPv6 example: 2606:4700:4700::1111
+
+Note: This example sends a spoofed packet for every matching packet, which may impact communication efficiency.
 
 1. nftables
 ```
@@ -51,7 +53,52 @@ ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:6553
 ```
 
 
-## If you need to use a low TTL (e.g., 2) with a correct checksum, set the mark to 0xDEA00002.
+## Example 2: TTL set to 3, incorrect TCP checksum, spoofed packet sent only once after handshake, mark is 0xDEA10103
+
+1. Nftables Configuration Example
+```
+#!/usr/sbin/nft -f
+
+# Flush all nftables rules (be careful with this line)
+flush ruleset
+
+table inet filter {
+    chain postrouting {
+        type filter hook postrouting priority 0 ; policy accept;
+        # Connections already marked will not be marked again
+        ct mark 0xDEA10103 return
+        # For IPv4: Destination 1.1.1.1, TCP port range 0-65535, packet length > 120,
+        # set connection mark and packet mark, then send
+        ip daddr {1.1.1.1} tcp dport { 0-65535 } meta length gt 120 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+        # For IPv6: Destination 2606:4700:4700::1111, TCP port range 0-65535, packet length > 100,
+        # set connection mark and packet mark, then send
+        ip6 daddr {2606:4700:4700::1111} tcp dport { 0-65535 } meta length gt 100 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+    }
+
+}
+```
+
+2. iptables
+
+```
+# For IPv4: Skip marking for connections already marked
+iptables  -t mangle -A POSTROUTING -m connmark --mark 0xDEA10103 -j ACCEPT
+# For IPv6: Skip marking for connections already marked
+ip6tables  -t mangle -A POSTROUTING -m connmark --mark 0xDEA10103 -j ACCEPT
+# For IPv4: Destination 1.1.1.1, TCP port range 0-65535, packet length > 120, set connection mark
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j CONNMARK --set-mark 0xDEA10103 
+# For IPv4: Set packet mark
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j MARK --set-xmark 0xDEA10103/0xFFFFFFFF
+# For IPv4: Accept the marked packet
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j ACCEPT
+# For IPv6: Destination 2606:4700:4700::1111, TCP port range 0-65535, packet length > 100, set connection mark
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j CONNMARK --set-mark 0xDEA10103
+# For IPv6: Set packet mark
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j MARK --set-xmark 0xDEA10103/0xFFFFFFFF
+# For IPv6: Accept the marked packet
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j ACCEPT
+```
+
 
 
 

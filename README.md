@@ -33,11 +33,13 @@ Forked from [LGA1150/nf_deaf](https://github.com/LGA1150/nf_deaf)，感谢原作
 | 延迟原包发送jiffies|8-12|
 | 设置TTL，全0保持系统默认|0-7|
 
-##  示例：最大化减小特征，其他不变只使用错误的TCP校验和，mark为0xDEA10000
+##  示例1：最大化减小特征，其他不变只使用错误的TCP校验和，mark为0xDEA10000，若需要使用低TTL（以2为例），校验和正常，只需设置mark为0xDEA00002
 
 示例IP: 1.1.1.1
   
 示例IPV6：2606:4700:4700::1111
+
+注意：本示例会给每个符合条件的包都发送一次伪装包，会影响通信效率
 
 1. nftables
 ```
@@ -50,12 +52,47 @@ iptables -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --
 ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j MARK --set-mark 0xDEA10000 -m comment --comment "hahaha"
 ```
 
-## 若需要使用低TTL（以2为例），校验和正常，只需设置mark为0xDEA00002
+## 示例2：TTL为3，错误的TCP校验和，只在握手成功后发一次伪装包，mark是0xDEA10103
 
+1. nftables配置文件示例
+```
+#!/usr/sbin/nft -f
 
+#清空nftables规则，小心这一条
+flush ruleset
 
+table inet filter {
+    chain postrouting {
+        type filter hook postrouting priority 0 ; policy accept;
+        #被标记的连接不再打标记
+        ct mark 0xDEA10103 return
+        #IPv4，目的地址1.1.1.1，TCP端口0-65535，长度大于120的包，设置连接标记和包标记后发出
+        ip daddr {1.1.1.1} tcp dport { 0-65535 } meta length gt 120 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+        #IPv6，目的地址2606:4700:4700::1111，TCP端口0-65535，长度大于100的包，设置连接标记和包标记后发出
+        ip6 daddr {2606:4700:4700::1111} tcp dport { 0-65535 } meta length gt 100 ct mark set 0xDEA10103 meta mark set 0xDEA10103 return
+    }
 
- 
+}
+```
 
+2. iptables
 
+```
+#IPv4被标记的连接不再打标记
+iptables  -t mangle -A POSTROUTING -m connmark --mark 0xDEA10103 -j ACCEPT
+#IPv6被标记的连接不再打标记
+ip6tables  -t mangle -A POSTROUTING -m connmark --mark 0xDEA10103 -j ACCEPT
+#IPv4，目的地址1.1.1.1，TCP端口0-65535，长度大于120的包，设置连接标记
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j CONNMARK --set-mark 0xDEA10103 
+#IPv4，目的地址1.1.1.1，TCP端口0-65535，长度大于120的包，设置包标记
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j MARK --set-xmark 0xDEA10103/0xFFFFFFFF
+#IPv4，目的地址1.1.1.1，TCP端口0-65535，长度大于120的包，打完标记发出
+iptables  -t mangle -A POSTROUTING -d 1.1.1.1 -p tcp --dport 0:65535 -m length --length 121:65535 -j ACCEPT
+#IPv6，目的地址2606:4700:4700::1111，TCP端口0-65535，长度大于100的包，设置连接标记
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j CONNMARK --set-mark 0xDEA10103
+#IPv6，目的地址2606:4700:4700::1111，TCP端口0-65535，长度大于100的包，设置包标记
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j MARK --set-xmark 0xDEA10103/0xFFFFFFFF
+#IPv6，目的地址2606:4700:4700::1111，TCP端口0-65535，长度大于100的包，打完标记发出
+ip6tables -t mangle -A POSTROUTING -d 2606:4700:4700::1111 -p tcp --dport 0:65535 -m length --length 101:65535 -j ACCEPT
+```
 
